@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"sync"
 
@@ -20,29 +21,30 @@ import (
 )
 
 type StatusMessage struct {
-	Worker  string
-	Message string
-	Error   error
+	Worker      string
+	Message     string
+	Error       error
+	RecordsSeen int
+	RecordsUsed int
+}
+
+type Statistics struct {
+	RecordsSeen int
+	RecordsUsed int
 }
 
 func main() {
-	//	config := Config{
-	//		DataciteRecordArchivePath:  "/home/tobias/Documents/src/mlmetacode/data/2023/dump.tar.gz",
-	//		DataciteRecordWorkerNumber: 15,
-	//		OutputDir:                  "/home/tobias/Documents/src/mlmetacode/code/retrieve/retrieve_go/2023",
-	//		SizeOfPayloadChunk:         32768,
-	//	}
-	config := config.Config{
-		DataciteRecordArchivePath:  "/tmp/small.tar.gz",
-		DataciteRecordWorkerNumber: 15,
-		OutputDir:                  "/tmp/small",
-		SizeOfPayloadChunk:         32768,
+	config, err := config.FromFile()
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
 	}
 	// Logging
 	logger := clog.SetupLogger(config)
+	logger.Info("Configuration: %s", config)
 
 	// Output setup
-	err := os.MkdirAll(config.OutputDir, os.ModePerm)
+	err = os.MkdirAll(config.OutputDir, os.ModePerm)
 	if err != nil {
 		logger.Error("Cannot create output dir logfile", "error", err)
 		os.Exit(1)
@@ -53,13 +55,20 @@ func main() {
 	dataciteRecordCh := readFromArchive(config, statusMessageCh)
 	processDataciteRecords(&wg, config, dataciteRecordCh, statusMessageCh)
 
+	stats := Statistics{}
+	regexForWorkerFinished := regexp.MustCompile("Worker [0-9]+ finished")
 	for msg := range statusMessageCh {
 		if msg.Error != nil {
 			logger.Error("ERROR", "error", msg.Error.Error(), "worker", msg.Worker)
 			continue
 		}
+		if regexForWorkerFinished.Match([]byte(msg.Message)) {
+			stats.RecordsSeen += msg.RecordsSeen
+			stats.RecordsUsed += msg.RecordsUsed
+		}
 		logger.Info("Event", "worker", msg.Worker, "message", msg.Message)
 	}
+	logger.Info("Finished processing", "recordsSeen", stats.RecordsSeen, "recordsUsed", stats.RecordsUsed)
 }
 
 func processDataciteRecords(wg *sync.WaitGroup, config config.Config, in <-chan []byte, out chan<- StatusMessage) {
@@ -112,8 +121,10 @@ func processDataciteRecords(wg *sync.WaitGroup, config config.Config, in <-chan 
 				}
 			}
 			out <- StatusMessage{
-				Message: fmt.Sprintf("Worker %d finished. %d records processed %d records usable", worker, recordsSeen, recordsUsed),
-				Worker:  worker,
+				Message:     fmt.Sprintf("Worker %s finished.", worker),
+				RecordsSeen: recordsSeen,
+				RecordsUsed: recordsUsed,
+				Worker:      worker,
 			}
 			wg.Done()
 		}()
@@ -134,6 +145,7 @@ func readFromArchive(config config.Config, messageCh chan<- StatusMessage) <-cha
 				Error:   err,
 				Worker:  "readFromArchive",
 			}
+			close(out)
 			return
 		}
 
