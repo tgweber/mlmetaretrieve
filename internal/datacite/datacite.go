@@ -3,9 +3,12 @@ package datacite
 import (
 	"encoding/json"
 	"os"
+	"regexp"
 
 	"github.com/google/uuid"
 )
+
+var startsAndEndsWithBrackets = regexp.MustCompile(`^\[.*\]$`)
 
 type DataciteRecord struct {
 	Descriptions []Description      `json:"descriptions"`
@@ -19,16 +22,16 @@ type DatacitePayload struct {
 }
 
 type Attributes struct {
-	Identifiers  []Identifier  `json:"identifiers"`
-	Titles       []Title       `json:"titles"`
-	Descriptions []Description `json:"descriptions"`
-	Subjects     []Subject     `json:"subjects"`
+	Identifiers  []InboundIdentifier `json:"identifiers"`
+	Titles       []Title             `json:"titles"`
+	Descriptions []Description       `json:"descriptions"`
+	Subjects     []Subject           `json:"subjects"`
 }
 
 type DataCiteInboundPayload struct {
-	Attributes   Attributes    `json:attributes`
+	Attributes   Attributes    `json:"attributes"`
 	Descriptions []Description `json:"descriptions"`
-	ID           string        `json:id`
+	ID           string        `json:"id"`
 	Identifiers  []Identifier  `json:"identifiers"`
 	Subjects     []Subject     `json:"subjects"`
 	Titles       []Title       `json:"titles"`
@@ -38,9 +41,14 @@ type OutboundIdentifier struct {
 	Value string `json:"value"`
 }
 
+type InboundIdentifier struct {
+	Identifier json.RawMessage `json:"identifier"`
+	Type       string          `json:"identifierType"`
+}
+
 type Identifier struct {
 	Identifier string `json:"identifier"`
-	Type       string `json:identifierType"`
+	Type       string `json:"identifierType"`
 }
 
 type Title struct {
@@ -110,7 +118,15 @@ func (d *DataciteRecord) UnmarshalJSON(data []byte) error {
 			if id.Type != "DOI" || len(id.Identifier) == 0 {
 				continue
 			}
-			d.Identifier.Value = id.Identifier
+			if startsAndEndsWithBrackets.Match(id.Identifier) {
+				identifiers := []string{}
+				_ = json.Unmarshal(id.Identifier, &identifiers)
+				d.Identifier.Value = identifiers[0]
+			} else {
+				var identifier string
+				_ = json.Unmarshal(id.Identifier, &identifier)
+				d.Identifier.Value = identifier
+			}
 		}
 	}
 	if len(d.Subjects) == 0 && len(inboundPayload.Attributes.Subjects) > 0 {

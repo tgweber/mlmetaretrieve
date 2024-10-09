@@ -11,42 +11,70 @@ type TestCase struct {
 	Want  DataciteRecord
 }
 
-func TestUnmarshalJSON(t *testing.T) {
-	// Arrange
-	table := []TestCase{
+var vanillaDataciteRecord DataciteRecord = DataciteRecord{
+	Descriptions: []Description{
 		{
-			Input: []byte(`{
-				"id":"10.1128/aac.00758-19",
+			Description:     "Description",
+			DescriptionType: "Abstract",
+		},
+	},
+	Identifier: OutboundIdentifier{
+		Value: "id",
+	},
+	Titles: []Title{
+		{
+			Title: "Title",
+		},
+	},
+	Subjects: []Subject{
+		{
+			SchemeURI:     "schemeURI",
+			Subject:       "subject",
+			SubjectScheme: "subjectScheme",
+			ValueURI:      "valueURI",
+		},
+	},
+}
+
+var happyPath TestCase = TestCase{
+	Input: []byte(`{
+				"id":"id",
 				"type":"dois",
 				"attributes":
 					{
-						"doi":"10.1128/aac.00758-19",
+						"doi":"id",
 						"identifiers":[
-							{"identifier":["AAC.00758-19","aac;AAC.00758-19v1"],"identifierType":"Publisher ID"}
+							{"identifier":"id","identifierType":"Publisher ID"}
 						],
 						"titles":[{"title":"Title"}],
-						"subjects":[],
+						"subjects":[{"SchemeURI": "schemeURI", "Subject": "subject", "SubjectScheme": "subjectScheme", "ValueURI": "valueURI"}],
 						"descriptions":[{"description":"Description","descriptionType":"Abstract"}]
 					}
 				}`),
-			Want: DataciteRecord{
-				Descriptions: []Description{
+	Want: vanillaDataciteRecord,
+}
+
+var multipleIdentifiers TestCase = TestCase{
+	Input: []byte(`{
+				"attributes":
 					{
-						Description:     "Description",
-						DescriptionType: "Abstract",
-					},
-				},
-				Identifier: OutboundIdentifier{
-					Value: "10.1128/aac.00758-19",
-				},
-				Titles: []Title{
-					{
-						Title: "Title",
-					},
-				},
-				Subjects: []Subject{},
-			},
-		},
+						"doi":"id",
+						"identifiers":[
+							{"identifier":["id","aac;AAC.00758-19v1"],"identifierType":"DOI"}
+						],
+						"titles":[{"title":"Title"}],
+						"subjects":[{"SchemeURI": "schemeURI", "Subject": "subject", "SubjectScheme": "subjectScheme", "ValueURI": "valueURI"}],
+						"descriptions":[{"description":"Description","descriptionType":"Abstract"}]
+					}
+				}`),
+	Want: vanillaDataciteRecord,
+}
+
+func TestUnmarshalJSON(t *testing.T) {
+	// Arrange
+	table := []TestCase{
+		happyPath,
+		multipleIdentifiers,
 	}
 	// Act
 	for _, tcase := range table {

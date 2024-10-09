@@ -41,7 +41,7 @@ func main() {
 	}
 	// Logging
 	logger := clog.SetupLogger(config)
-	logger.Info("Configuration: %s", config)
+	logger.Info("Configuration", "config", config)
 
 	// Output setup
 	err = os.MkdirAll(config.OutputDir, os.ModePerm)
