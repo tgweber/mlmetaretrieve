@@ -89,7 +89,7 @@ func processDataciteRecords(wg *sync.WaitGroup, config config.Config, in <-chan 
 				if err != nil {
 					out <- StatusMessage{
 						Message: "Error",
-						Error:   fmt.Errorf("Could not create datacite payload: %v payload_start: %s", err, string(payload)[:40]),
+						Error:   fmt.Errorf("Could not create datacite payload: %v payload: %s", err, string(payload)),
 						Worker:  worker,
 					}
 				}
